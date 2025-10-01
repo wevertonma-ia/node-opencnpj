@@ -100,10 +100,13 @@ export class OpenCnpj implements INodeType {
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
-		const returnData: INodeExecutionData[] = [];
+		let returnData: INodeExecutionData[] = [];
+
+		// Get parameters fresh for each execution
 		const operation = this.getNodeParameter('operation', 0) as Operation;
 		const resource = this.getNodeParameter('resource', 0) as Resource;
 
+		// Process each item independently to avoid cache issues
 		for (let i = 0; i < items.length; i++) {
 			try {
 				if (resource === 'company' && operation === 'get') {
@@ -111,6 +114,7 @@ export class OpenCnpj implements INodeType {
 					//             get
 					// ----------------------------------
 
+					// Get fresh parameters for each item
 					const cnpj = this.getNodeParameter('cnpj', i) as string;
 					const options = this.getNodeParameter('options', i) as OpenCnpjOptions;
 
@@ -127,17 +131,19 @@ export class OpenCnpj implements INodeType {
 						);
 					}
 
-					// Make API request
+					// Make API request with fresh endpoint for each call
 					const endpoint = `/cnpj/${cleanedCnpj}`;
 					const response = await openCnpjApiRequest.call(this, 'GET', endpoint) as CompanyData;
 
-					let responseData: CompanyData | any = response;
+					// Create fresh response data object
+					let responseData: CompanyData | any = JSON.parse(JSON.stringify(response));
 
 					// Apply simplification if requested
 					if (options.simplify) {
-						responseData = simplifyResponse(response);
+						responseData = simplifyResponse(responseData);
 					}
 
+					// Add execution metadata with unique identifiers
 					const executionData = this.helpers.constructExecutionMetaData(
 						this.helpers.returnJsonArray(responseData),
 						{ itemData: { item: i } },
@@ -147,7 +153,7 @@ export class OpenCnpj implements INodeType {
 			} catch (error) {
 				if (this.continueOnFail()) {
 					const executionData = this.helpers.constructExecutionMetaData(
-						[{ json: { error: error.message } }],
+						[{ json: { error: error.message, itemIndex: i, timestamp: Date.now() } }],
 						{ itemData: { item: i } },
 					);
 					returnData.push(...executionData);
@@ -178,6 +184,7 @@ export class OpenCnpj implements INodeType {
 			}
 		}
 
+		// Return fresh array
 		return [returnData];
 	}
 

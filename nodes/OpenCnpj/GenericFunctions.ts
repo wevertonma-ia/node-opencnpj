@@ -15,15 +15,28 @@ export async function openCnpjApiRequest(
 	endpoint: string,
 	body: object = {},
 ) {
+	// Generate unique timestamp to prevent caching
+	const timestamp = Date.now();
+	const randomId = Math.random().toString(36).substring(7);
+
+	// Add cache-busting query parameter
+	const separator = endpoint.includes('?') ? '&' : '?';
+	const cacheBustingEndpoint = `${endpoint}${separator}_t=${timestamp}&_r=${randomId}`;
+
 	const options: IHttpRequestOptions = {
 		headers: {
 			'Accept': 'application/json',
-			'User-Agent': 'n8n-nodes-opencnpj/0.2.0',
+			'User-Agent': `n8n-nodes-opencnpj/0.2.1-${timestamp}`,
+			'Cache-Control': 'no-cache, no-store, must-revalidate',
+			'Pragma': 'no-cache',
+			'Expires': '0',
+			'X-Requested-With': 'XMLHttpRequest',
 		},
 		method,
 		body,
-		url: `https://publica.cnpj.ws${endpoint}`,
+		url: `https://publica.cnpj.ws${cacheBustingEndpoint}`,
 		json: true,
+		timeout: 30000, // 30 seconds timeout
 	};
 
 	if (Object.keys(body).length === 0) {
