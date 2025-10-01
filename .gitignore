@@ -1,8 +1,70 @@
-node_modules
-.DS_Store
-.tmp
-tmp
-dist
+# Dependencies
+node_modules/
 npm-debug.log*
-yarn.lock
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist/
+.tmp/
+tmp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
 .vscode/launch.json
+.idea/
+
+# Development/Test files
+build-and-test.bat
+check-n8n-nodes.js
+complete-test.bat
+debug-installation.js
+debug-node-loading.js
+test-*.js
+start-n8n*.bat
+start-n8n*.ps1
+setup-n8n-custom.bat
+test-local.bat
+
+# Package files
+*.tgz
+package-local.json
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+
+# Development folders
+credentials/
+.vscode/
+
+# Build and development files
+gulpfile.js
+.editorconfig
+.eslintrc.prepublish.js
+.prettierrc.js
+CODE_OF_CONDUCT.md
+
+# Template and example files
+README_TEMPLATE.md
+**/ExampleNode/
+**/MyFirstNode/
+**/HttpBin/
+**/BrazilCep/
+
+# Test and debug files
+index.js
+test-*.bat
+debug-*.js
+*-test.bat
+*-debug.*
+
+# Package archives
+*.tgz
+*.tar.gz
