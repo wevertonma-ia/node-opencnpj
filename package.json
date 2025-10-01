@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-opencnpj",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "n8n node to consult Brazilian company data by CNPJ using OpenCNPJ API.",
 	"keywords": [
 		"n8n-community-node-package"
