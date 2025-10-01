@@ -18,7 +18,7 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 ## Operations
 
 ### Company
-- **Get**: Retrieve Brazilian company data by CNPJ
+- **Get**: Retrieve Brazilian company data by CNPJ with automatic validation
 
 ## Credentials
 
@@ -37,13 +37,41 @@ This node doesn't require any credentials. The OpenCNPJ API is free and doesn't 
 4. Enter a valid Brazilian CNPJ (14 digits, with or without punctuation)
 5. Optionally enable "Simplify" to get a cleaner output with the most important fields
 
+### Features
+
+- **CNPJ Validation**: Automatically validates CNPJ format and check digits before making API requests
+- **Multiple Formats**: Accepts CNPJ with or without punctuation
+- **Error Handling**: Clear error messages with guidance on how to fix issues
+- **Simplified Output**: Option to return only the most important company information
+- **Batch Processing**: Supports processing multiple CNPJs from previous nodes
+
 ### Example CNPJ
 You can test with this example CNPJ: `11222333000181`
 
 ### Supported CNPJ formats
 - Numbers only: `11222333000181`
 - With full punctuation: `11.222.333/0001-81`
-- With dots and slash: `11.222.333/000181`
+- Partial punctuation: `11.222.333/000181`
+
+### Output Fields (Simplified Mode)
+When "Simplify" is enabled, the node returns only the most relevant fields:
+- Company name (razao_social)
+- Trade name (nome_fantasia)
+- Registration status (situacao_cadastral)
+- Company size (porte)
+- Legal nature (natureza_juridica)
+- Share capital (capital_social)
+- Complete address
+- Phone and email
+- Main activity
+- Start date
+
+### Error Handling
+The node provides clear error messages for common issues:
+- Invalid CNPJ format or check digits
+- Company not found (404)
+- API rate limiting (429)
+- Network or API errors
 
 ## Resources
 
