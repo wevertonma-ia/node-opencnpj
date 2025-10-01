@@ -16,10 +16,10 @@ export class OpenCnpj implements INodeType {
 		outputs: ['main'],
 		credentials: [],
 		requestDefaults: {
-			baseURL: 'https://api.opencnpj.org',
+			baseURL: 'https://publica.cnpj.ws/cnpj',
 			headers: {
 				Accept: 'application/json',
-				'Content-Type': 'application/json',
+				'User-Agent': 'n8n-nodes-opencnpj/1.0.0',
 			},
 		},
 		properties: [
@@ -55,7 +55,7 @@ export class OpenCnpj implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '={{$parameter["cnpj"]}}',
+								url: '/{{$parameter["cnpj"]}}',
 							},
 						},
 					},
