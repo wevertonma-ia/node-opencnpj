@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-opencnpj",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "n8n node to consult Brazilian company data by CNPJ using OpenCNPJ API.",
 	"keywords": [
 		"n8n-community-node-package"
@@ -13,7 +13,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/wevertonma-ia/node-opencnpj.git"
+		"url": "git+https://github.com/wevertonma-ia/node-opencnpj.git"
 	},
 	"engines": {
 		"node": ">=20.15"

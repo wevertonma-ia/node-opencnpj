@@ -1,10 +1,13 @@
-import {
+import type {
 	IExecuteFunctions,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
-	NodeOperationError,
 } from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+
+import { openCnpjApiRequest, cleanCnpj, isValidCnpj, simplifyResponse } from './GenericFunctions';
+import type { Operation, Resource, OpenCnpjOptions, CompanyData } from './types';
 
 export class OpenCnpj implements INodeType {
 	description: INodeTypeDescription = {
@@ -18,8 +21,8 @@ export class OpenCnpj implements INodeType {
 		defaults: {
 			name: 'OpenCNPJ',
 		},
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [],
 		properties: [
 			{
@@ -98,15 +101,18 @@ export class OpenCnpj implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
+		const operation = this.getNodeParameter('operation', 0) as Operation;
+		const resource = this.getNodeParameter('resource', 0) as Resource;
 
 		for (let i = 0; i < items.length; i++) {
 			try {
-				const resource = this.getNodeParameter('resource', i) as string;
-				const operation = this.getNodeParameter('operation', i) as string;
-
 				if (resource === 'company' && operation === 'get') {
+					// ----------------------------------
+					//             get
+					// ----------------------------------
+
 					const cnpj = this.getNodeParameter('cnpj', i) as string;
-					const options = this.getNodeParameter('options', i) as { simplify?: boolean };
+					const options = this.getNodeParameter('options', i) as OpenCnpjOptions;
 
 					// Clean and validate CNPJ
 					const cleanedCnpj = cleanCnpj(cnpj);
@@ -122,130 +128,57 @@ export class OpenCnpj implements INodeType {
 					}
 
 					// Make API request
-					const response = await this.helpers.httpRequest({
-						method: 'GET',
-						url: `https://publica.cnpj.ws/cnpj/${cleanedCnpj}`,
-						headers: {
-							'Accept': 'application/json',
-							'User-Agent': 'n8n-nodes-opencnpj/1.0.0',
-						},
-						json: true,
-					});
+					const endpoint = `/cnpj/${cleanedCnpj}`;
+					const response = await openCnpjApiRequest.call(this, 'GET', endpoint) as CompanyData;
 
-					let responseData = response;
+					let responseData: CompanyData | any = response;
 
 					// Apply simplification if requested
 					if (options.simplify) {
 						responseData = simplifyResponse(response);
 					}
 
-					returnData.push({
-						json: responseData,
-						pairedItem: { item: i },
-					});
+					const executionData = this.helpers.constructExecutionMetaData(
+						this.helpers.returnJsonArray(responseData),
+						{ itemData: { item: i } },
+					);
+					returnData.push(...executionData);
 				}
 			} catch (error) {
 				if (this.continueOnFail()) {
-					returnData.push({
-						json: { error: error.message },
-						pairedItem: { item: i },
-					});
-				} else {
-					// Improve error messages for common HTTP errors
-					if (error.response?.status === 404) {
-						throw new NodeOperationError(
-							this.getNode(),
-							`Company with CNPJ "${this.getNodeParameter('cnpj', i)}" was not found`,
-							{
-								itemIndex: i,
-								description: 'Please verify the CNPJ number is correct and the company is registered in Brazil'
-							}
-						);
-					} else if (error.response?.status === 429) {
-						throw new NodeOperationError(
-							this.getNode(),
-							'Too many requests to the OpenCNPJ API',
-							{
-								itemIndex: i,
-								description: 'Please wait a moment before making another request'
-							}
-						);
-					}
-					throw error;
+					const executionData = this.helpers.constructExecutionMetaData(
+						[{ json: { error: error.message } }],
+						{ itemData: { item: i } },
+					);
+					returnData.push(...executionData);
+					continue;
 				}
+
+				// Improve error messages for common HTTP errors
+				if (error.response?.status === 404) {
+					throw new NodeOperationError(
+						this.getNode(),
+						`Company with CNPJ "${this.getNodeParameter('cnpj', i)}" was not found`,
+						{
+							itemIndex: i,
+							description: 'Please verify the CNPJ number is correct and the company is registered in Brazil'
+						}
+					);
+				} else if (error.response?.status === 429) {
+					throw new NodeOperationError(
+						this.getNode(),
+						'Too many requests to the OpenCNPJ API',
+						{
+							itemIndex: i,
+							description: 'Please wait a moment before making another request'
+						}
+					);
+				}
+				throw error;
 			}
 		}
 
 		return [returnData];
 	}
 
-}
-
-function cleanCnpj(cnpj: string): string {
-	// Remove all non-numeric characters
-	return cnpj.replace(/\D/g, '');
-}
-
-function isValidCnpj(cnpj: string): boolean {
-		// Check if CNPJ has exactly 14 digits
-		if (cnpj.length !== 14) {
-			return false;
-		}
-
-		// Check if all digits are the same (invalid CNPJs)
-		if (/^(\d)\1{13}$/.test(cnpj)) {
-			return false;
-		}
-
-		// Validate CNPJ check digits
-		let sum = 0;
-		let weight = 2;
-
-		// First check digit
-		for (let i = 11; i >= 0; i--) {
-			sum += parseInt(cnpj.charAt(i)) * weight;
-			weight = weight === 9 ? 2 : weight + 1;
-		}
-
-		let checkDigit1 = sum % 11 < 2 ? 0 : 11 - (sum % 11);
-		if (checkDigit1 !== parseInt(cnpj.charAt(12))) {
-			return false;
-		}
-
-		// Second check digit
-		sum = 0;
-		weight = 2;
-		for (let i = 12; i >= 0; i--) {
-			sum += parseInt(cnpj.charAt(i)) * weight;
-			weight = weight === 9 ? 2 : weight + 1;
-		}
-
-		let checkDigit2 = sum % 11 < 2 ? 0 : 11 - (sum % 11);
-		return checkDigit2 === parseInt(cnpj.charAt(13));
-	}
-
-function simplifyResponse(response: any): any {
-		return {
-			cnpj: response.cnpj,
-			razao_social: response.razao_social,
-			nome_fantasia: response.nome_fantasia,
-			situacao_cadastral: response.situacao_cadastral,
-			data_situacao_cadastral: response.data_situacao_cadastral,
-			porte: response.porte,
-			natureza_juridica: response.natureza_juridica,
-			capital_social: response.capital_social,
-			endereco: {
-				logradouro: response.logradouro,
-				numero: response.numero,
-				complemento: response.complemento,
-				bairro: response.bairro,
-				cep: response.cep,
-				municipio: response.municipio,
-				uf: response.uf,
-			},
-			telefone: response.telefone1,
-			email: response.email,
-			atividade_principal: response.atividade_principal,
-			data_inicio_atividade: response.data_inicio_atividade,
-		};
 }
