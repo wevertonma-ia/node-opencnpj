@@ -1,32 +1,37 @@
 import type {
+	IDataObject,
 	IExecuteFunctions,
 	IHttpRequestMethods,
-	IHttpRequestOptions,
+	ILoadOptionsFunctions,
+	IRequestOptions,
 	JsonObject,
 } from 'n8n-workflow';
 import { NodeApiError } from 'n8n-workflow';
+
+import type { CompanyData, SimplifiedCompanyData } from './types';
 
 /**
  * Make a request to OpenCNPJ API.
  */
 export async function openCnpjApiRequest(
-	this: IExecuteFunctions,
+	this: IExecuteFunctions | ILoadOptionsFunctions,
 	method: IHttpRequestMethods,
 	endpoint: string,
-	body: object = {},
+	body: IDataObject = {},
+	qs: IDataObject = {},
 ) {
-	// Generate unique timestamp to prevent caching
+	// Generate unique identifiers to prevent caching
 	const timestamp = Date.now();
 	const randomId = Math.random().toString(36).substring(7);
 
-	// Add cache-busting query parameter
+	// Add cache-busting query parameters
 	const separator = endpoint.includes('?') ? '&' : '?';
 	const cacheBustingEndpoint = `${endpoint}${separator}_t=${timestamp}&_r=${randomId}`;
 
-	const options: IHttpRequestOptions = {
+	const options: IRequestOptions = {
 		headers: {
 			'Accept': 'application/json',
-			'User-Agent': `n8n-nodes-opencnpj/0.2.1-${timestamp}`,
+			'User-Agent': `n8n-nodes-opencnpj/0.2.2-${timestamp}`,
 			'Cache-Control': 'no-cache, no-store, must-revalidate',
 			'Pragma': 'no-cache',
 			'Expires': '0',
@@ -34,17 +39,22 @@ export async function openCnpjApiRequest(
 		},
 		method,
 		body,
-		url: `https://publica.cnpj.ws${cacheBustingEndpoint}`,
+		qs,
+		uri: `https://publica.cnpj.ws${cacheBustingEndpoint}`,
 		json: true,
 		timeout: 30000, // 30 seconds timeout
 	};
+
+	if (Object.keys(qs).length === 0) {
+		delete options.qs;
+	}
 
 	if (Object.keys(body).length === 0) {
 		delete options.body;
 	}
 
 	try {
-		return await this.helpers.httpRequest(options);
+		return await this.helpers.request(options);
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
@@ -101,7 +111,7 @@ export function isValidCnpj(cnpj: string): boolean {
 /**
  * Simplify the OpenCNPJ API response to return only the most relevant fields
  */
-export function simplifyResponse(response: any): any {
+export function simplifyResponse(response: CompanyData): SimplifiedCompanyData {
 	return {
 		cnpj: response.cnpj,
 		razao_social: response.razao_social,
@@ -126,3 +136,6 @@ export function simplifyResponse(response: any): any {
 		data_inicio_atividade: response.data_inicio_atividade,
 	};
 }
+
+export const toOptions = (items: any[]) =>
+	items.map(({ name, id }) => ({ name, value: id }));

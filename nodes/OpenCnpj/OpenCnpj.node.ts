@@ -1,13 +1,25 @@
-import type {
-	IExecuteFunctions,
-	INodeExecutionData,
-	INodeType,
-	INodeTypeDescription,
+import {
+	type IExecuteFunctions,
+	type INodeExecutionData,
+	type INodeType,
+	type INodeTypeDescription,
+	NodeConnectionTypes,
+	NodeOperationError,
 } from 'n8n-workflow';
-import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
-import { openCnpjApiRequest, cleanCnpj, isValidCnpj, simplifyResponse } from './GenericFunctions';
-import type { Operation, Resource, OpenCnpjOptions, CompanyData } from './types';
+import {
+	openCnpjApiRequest,
+	cleanCnpj,
+	isValidCnpj,
+	simplifyResponse,
+} from './GenericFunctions';
+import { operationFields } from './OperationDescription';
+import type {
+	GetAdditionalOptions,
+	Operation,
+	Resource,
+	CompanyData,
+} from './types';
 
 export class OpenCnpj implements INodeType {
 	description: INodeTypeDescription = {
@@ -16,13 +28,14 @@ export class OpenCnpj implements INodeType {
 		icon: 'file:opencnpj.svg',
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{$parameter["operation"]}}',
 		description: 'Consult Brazilian company data by CNPJ using OpenCNPJ API',
+		subtitle: '={{$parameter["operation"] + ":" + $parameter["resource"]}}',
 		defaults: {
 			name: 'OpenCNPJ',
 		},
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
+		usableAsTool: true,
 		credentials: [],
 		properties: [
 			{
@@ -52,61 +65,22 @@ export class OpenCnpj implements INodeType {
 					{
 						name: 'Get',
 						value: 'get',
-						action: 'Get company data',
 						description: 'Retrieve Brazilian company data by CNPJ',
+						action: 'Get company data',
 					},
 				],
 				default: 'get',
 			},
-			{
-				displayName: 'CNPJ',
-				name: 'cnpj',
-				type: 'string',
-				required: true,
-				default: '',
-				placeholder: 'e.g. 11.222.333/0001-81',
-				description: 'Brazilian company CNPJ (14 digits, with or without punctuation)',
-				displayOptions: {
-					show: {
-						resource: ['company'],
-						operation: ['get'],
-					},
-				},
-			},
-			{
-				displayName: 'Options',
-				name: 'options',
-				type: 'collection',
-				placeholder: 'Add Option',
-				default: {},
-				displayOptions: {
-					show: {
-						resource: ['company'],
-						operation: ['get'],
-					},
-				},
-				options: [
-					{
-						displayName: 'Simplify',
-						name: 'simplify',
-						type: 'boolean',
-						default: false,
-						description: 'Whether to return a simplified version of the response instead of the raw data',
-					},
-				],
-			},
-		]
+			...operationFields,
+		],
 	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
-		let returnData: INodeExecutionData[] = [];
-
-		// Get parameters fresh for each execution
+		const returnData: INodeExecutionData[] = [];
 		const operation = this.getNodeParameter('operation', 0) as Operation;
 		const resource = this.getNodeParameter('resource', 0) as Resource;
 
-		// Process each item independently to avoid cache issues
 		for (let i = 0; i < items.length; i++) {
 			try {
 				if (resource === 'company' && operation === 'get') {
@@ -114,9 +88,8 @@ export class OpenCnpj implements INodeType {
 					//             get
 					// ----------------------------------
 
-					// Get fresh parameters for each item
 					const cnpj = this.getNodeParameter('cnpj', i) as string;
-					const options = this.getNodeParameter('options', i) as OpenCnpjOptions;
+					const additionalOptions = this.getNodeParameter('additionalOptions', i) as GetAdditionalOptions;
 
 					// Clean and validate CNPJ
 					const cleanedCnpj = cleanCnpj(cnpj);
@@ -131,19 +104,18 @@ export class OpenCnpj implements INodeType {
 						);
 					}
 
-					// Make API request with fresh endpoint for each call
+					// Make API request
 					const endpoint = `/cnpj/${cleanedCnpj}`;
 					const response = await openCnpjApiRequest.call(this, 'GET', endpoint) as CompanyData;
 
-					// Create fresh response data object
+					// Create fresh response data object to prevent reference sharing
 					let responseData: CompanyData | any = JSON.parse(JSON.stringify(response));
 
 					// Apply simplification if requested
-					if (options.simplify) {
+					if (additionalOptions.simplify) {
 						responseData = simplifyResponse(responseData);
 					}
 
-					// Add execution metadata with unique identifiers
 					const executionData = this.helpers.constructExecutionMetaData(
 						this.helpers.returnJsonArray(responseData),
 						{ itemData: { item: i } },
@@ -184,8 +156,6 @@ export class OpenCnpj implements INodeType {
 			}
 		}
 
-		// Return fresh array
 		return [returnData];
 	}
-
 }
